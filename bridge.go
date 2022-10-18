@@ -2,24 +2,67 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"log"
+	"net"
+	"os"
 
 	"github.com/tarm/serial"
 
 	"github.com/roaldnefs/go-dsmr"
 )
 
+const (
+	ServerHost = ""
+	ServerPort = "9988"
+	ServerType = "tcp"
+)
+
+var AllowSerialPortFailure = false
+
 func main() {
 	telegrams := make(chan dsmr.Telegram)
 
 	go ReadTelegrams("/dev/ttyUSB0", telegrams)
+
+	go startServer()
 
 	for t := range telegrams {
 		log.Println(t)
 	}
 }
 
-var AllowSerialPortFailure = false
+func startServer() {
+	fmt.Println("Server Running...")
+	server, err := net.Listen(ServerType, ServerHost+":"+ServerPort)
+	if err != nil {
+		fmt.Println("Error listening:", err.Error())
+		os.Exit(1)
+	}
+	defer server.Close()
+	fmt.Println("Listening on " + ServerHost + ":" + ServerPort)
+	fmt.Println("Waiting for client...")
+	for {
+		connection, err := server.Accept()
+		if err != nil {
+			fmt.Println("Error accepting: ", err.Error())
+			os.Exit(1)
+		}
+		fmt.Println("client connected")
+		go processClient(connection)
+	}
+}
+
+func processClient(connection net.Conn) {
+	buffer := make([]byte, 1024)
+	mLen, err := connection.Read(buffer)
+	if err != nil {
+		fmt.Println("Error reading:", err.Error())
+	}
+	fmt.Println("Received: ", string(buffer[:mLen]))
+	_, err = connection.Write([]byte("Thanks! Got your message:" + string(buffer[:mLen])))
+	_ = connection.Close()
+}
 
 // ReadTelegrams reads telegrams from the given serial port into the given readout channel.
 func ReadTelegrams(serialPort string, telegrams chan dsmr.Telegram) {
