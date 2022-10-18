@@ -55,19 +55,21 @@ func startServer(clients chan net.Conn) {
 
 func sendTelegrams(connections chan net.Conn, telegrams chan string) {
 	clients := make([]net.Conn, 0)
-	select {
-	case connection := <-connections:
-		clients = append(clients, connection)
-	case telegram := <-telegrams:
-		for i, c := range clients {
-			_, err := c.Write([]byte(telegram))
-			if err != nil {
-				_ = c.Close()
-				clients = append(clients[:i], clients[i+1:]...)
-				log.Println("client disconnected")
-				continue
+	for {
+		select {
+		case connection := <-connections:
+			clients = append(clients, connection)
+		case telegram := <-telegrams:
+			for i, c := range clients {
+				_, err := c.Write([]byte(telegram))
+				if err != nil {
+					_ = c.Close()
+					clients = append(clients[:i], clients[i+1:]...)
+					log.Println("client disconnected")
+					continue
+				}
+				log.Println(telegram)
 			}
-			log.Println(telegram)
 		}
 	}
 }
