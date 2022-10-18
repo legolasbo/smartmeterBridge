@@ -21,18 +21,18 @@ const (
 var AllowSerialPortFailure = false
 
 func main() {
-	telegrams := make(chan dsmr.Telegram)
+	//telegrams := make(chan dsmr.Telegram)
+	rawTelegrams := make(chan string)
 
-	go ReadTelegrams("/dev/ttyUSB0", telegrams)
+	//go ReadTelegrams("/dev/ttyUSB0", telegrams)
+	go ReadRawTelegrams("/dev/ttyUSB0", rawTelegrams)
 
-	go startServer()
-
-	for t := range telegrams {
-		log.Print(t.TextMessage())
-	}
+	newConnections := make(chan net.Conn)
+	go startServer(newConnections)
+	sendTelegrams(newConnections, rawTelegrams)
 }
 
-func startServer() {
+func startServer(clients chan net.Conn) {
 	fmt.Println("Server Running...")
 	server, err := net.Listen(ServerType, ServerHost+":"+ServerPort)
 	if err != nil {
@@ -48,8 +48,27 @@ func startServer() {
 			fmt.Println("Error accepting: ", err.Error())
 			os.Exit(1)
 		}
+		clients <- connection
 		fmt.Println("client connected")
-		go processClient(connection)
+	}
+}
+
+func sendTelegrams(connections chan net.Conn, telegrams chan string) {
+	clients := make([]net.Conn, 0)
+	select {
+	case connection := <-connections:
+		clients = append(clients, connection)
+	case telegram := <-telegrams:
+		for i, c := range clients {
+			_, err := c.Write([]byte(telegram))
+			if err != nil {
+				_ = c.Close()
+				clients = append(clients[:i], clients[i+1:]...)
+				log.Println("client disconnected")
+				continue
+			}
+			log.Println(telegram)
+		}
 	}
 }
 
@@ -66,11 +85,15 @@ func processClient(connection net.Conn) {
 
 // ReadTelegrams reads telegrams from the given serial port into the given readout channel.
 func ReadTelegrams(serialPort string, telegrams chan dsmr.Telegram) {
-	lineChan := make(chan string)
 	rawTelegrams := make(chan string)
+	ReadRawTelegrams(serialPort, rawTelegrams)
+	parseTelegrams(rawTelegrams, telegrams)
+}
+
+func ReadRawTelegrams(serialPort string, rawTelegrams chan string) {
+	lineChan := make(chan string)
 	go readLines(serialPort, lineChan)
 	go collectTelegrams(lineChan, rawTelegrams)
-	parseTelegrams(rawTelegrams, telegrams)
 }
 
 func readLines(serialPort string, rChan chan string) {
