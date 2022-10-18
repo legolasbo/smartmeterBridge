@@ -28,7 +28,7 @@ func main() {
 	go startServer()
 
 	for t := range telegrams {
-		log.Println(t)
+		log.Print(t.TextMessage())
 	}
 }
 
