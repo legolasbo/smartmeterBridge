@@ -8,11 +8,10 @@ import (
 	"os"
 
 	"github.com/tarm/serial"
-
-	"github.com/roaldnefs/go-dsmr"
 )
 
 const (
+	SerialPort = "/dev/ttyUSB0"
 	ServerHost = ""
 	ServerPort = "9988"
 	ServerType = "tcp"
@@ -21,11 +20,9 @@ const (
 var AllowSerialPortFailure = false
 
 func main() {
-	//telegrams := make(chan dsmr.Telegram)
 	rawTelegrams := make(chan string)
 
-	//go ReadTelegrams("/dev/ttyUSB0", telegrams)
-	go ReadRawTelegrams("/dev/ttyUSB0", rawTelegrams)
+	go ReadRawTelegrams(SerialPort, rawTelegrams)
 
 	newConnections := make(chan net.Conn)
 	go startServer(newConnections)
@@ -74,24 +71,6 @@ func sendTelegrams(connections chan net.Conn, telegrams chan string) {
 	}
 }
 
-func processClient(connection net.Conn) {
-	buffer := make([]byte, 1024)
-	mLen, err := connection.Read(buffer)
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
-	}
-	fmt.Println("Received: ", string(buffer[:mLen]))
-	_, err = connection.Write([]byte("Thanks! Got your message:" + string(buffer[:mLen])))
-	_ = connection.Close()
-}
-
-// ReadTelegrams reads telegrams from the given serial port into the given readout channel.
-func ReadTelegrams(serialPort string, telegrams chan dsmr.Telegram) {
-	rawTelegrams := make(chan string)
-	ReadRawTelegrams(serialPort, rawTelegrams)
-	parseTelegrams(rawTelegrams, telegrams)
-}
-
 func ReadRawTelegrams(serialPort string, rawTelegrams chan string) {
 	lineChan := make(chan string)
 	go readLines(serialPort, lineChan)
@@ -134,7 +113,7 @@ func collectTelegrams(rChan chan string, tChan chan string) {
 			telegram = ""
 		}
 
-		// We usually start halfway trough a telegram.
+		// We usually start halfway through a telegram.
 		// Which means that the first telegram would be corrupt.
 		// We therefore ignore everything until the first telegram start.
 		if !foundStart {
@@ -147,17 +126,5 @@ func collectTelegrams(rChan chan string, tChan chan string) {
 		if line[0] == '!' {
 			tChan <- telegram
 		}
-	}
-}
-
-func parseTelegrams(rawTelegrams chan string, telegrams chan dsmr.Telegram) {
-	for t := range rawTelegrams {
-		telegram, err := dsmr.ParseTelegram(t)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		telegrams <- telegram
 	}
 }
