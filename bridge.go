@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -17,8 +16,6 @@ const (
 	ServerType = "tcp"
 )
 
-var AllowSerialPortFailure = false
-
 func main() {
 	rawTelegrams := make(chan string)
 
@@ -30,23 +27,26 @@ func main() {
 }
 
 func startServer(clients chan net.Conn) {
-	fmt.Println("Server Running...")
+	log.Println("Server Running...")
 	server, err := net.Listen(ServerType, ServerHost+":"+ServerPort)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
+		log.Println("Could not start server:", err.Error())
 		os.Exit(1)
 	}
-	defer server.Close()
-	fmt.Println("Listening on " + ServerHost + ":" + ServerPort)
-	fmt.Println("Waiting for client...")
+	defer func(server net.Listener) {
+		_ = server.Close()
+	}(server)
+
+	log.Println("Listening on " + ServerHost + ":" + ServerPort)
 	for {
-		connection, err := server.Accept()
+		c, err := server.Accept()
 		if err != nil {
-			fmt.Println("Error accepting: ", err.Error())
-			os.Exit(1)
+			log.Println("Error accepting", c.RemoteAddr(), err.Error())
+			_ = c.Close()
+			continue
 		}
-		clients <- connection
-		fmt.Println("client connected")
+		clients <- c
+		log.Println(c.RemoteAddr(), "connected")
 	}
 }
 
@@ -62,7 +62,7 @@ func sendTelegrams(connections chan net.Conn, telegrams chan string) {
 				if err != nil {
 					_ = c.Close()
 					clients = append(clients[:i], clients[i+1:]...)
-					log.Println("client disconnected")
+					log.Println(c.RemoteAddr(), "disconnected")
 					continue
 				}
 				log.Println(telegram)
@@ -85,9 +85,6 @@ func readLines(serialPort string, rChan chan string) {
 
 	s, err := serial.OpenPort(c)
 	if err != nil {
-		if AllowSerialPortFailure {
-			return
-		}
 		log.Fatal(err)
 	}
 
