@@ -1,0 +1,11 @@
+# serial_port is required and points to the serial file handle you want to use.
+serial_port: "/dev/ttyUSB0"
+
+# server is a map containing the server config.
+# - host configures the server address on which the server listens.
+#   This can be a hostname, but this is not recommended because it will create a listener for at most one of the host's IP addresses.
+#   If the parameter is left empty or a literal unspecified IP address, it will listen on all available unicast and anycast IP addresses of the local system.
+# - port configures the port on which to listen. If the port is left empty or "0", a port number is automatically chosen.
+server:
+  host: ""
+  port: 9988

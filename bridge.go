@@ -5,21 +5,64 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 
+	"github.com/go-yaml/yaml"
 	"github.com/tarm/serial"
 )
 
 const (
-	SerialPort = "/dev/ttyUSB0"
-	ServerHost = ""
-	ServerPort = "9988"
 	ServerType = "tcp"
 )
 
+var Paths = []string{"/etc/smartmeter-bridge/config.yml", "config.yml"}
+
+type ServerConfig struct {
+	Host string `yaml:"host"`
+	Port int64  `yaml:"port"`
+}
+
+func (c ServerConfig) validate() {
+	if c.Port < 0 {
+		log.Fatal("Server port number must be positive or 0 for automatic port selection")
+	}
+}
+
+type Config struct {
+	SerialPort string       `yaml:"serial_port"`
+	Server     ServerConfig `yaml:"server"`
+}
+
+var config = Config{}
+
+func (c Config) validate() {
+	if c.SerialPort == "" {
+		log.Fatal("Serial port is not configured")
+	}
+	c.Server.validate()
+}
+
 func main() {
+	config.SerialPort = os.Getenv("SMB_SERIAL_PORT")
+	config.Server.Host = os.Getenv("SMB_SERVER_HOST")
+	config.Server.Port, _ = strconv.ParseInt(os.Getenv("SMB_SERVER_PORT"), 10, 64)
+	for _, path := range Paths {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		err = yaml.Unmarshal(b, &config)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	config.validate()
+
 	rawTelegrams := make(chan string)
 
-	go ReadRawTelegrams(SerialPort, rawTelegrams)
+	go ReadRawTelegrams(config.SerialPort, rawTelegrams)
 
 	newConnections := make(chan net.Conn)
 	go startServer(newConnections)
@@ -27,8 +70,8 @@ func main() {
 }
 
 func startServer(clients chan net.Conn) {
-	log.Println("Server Running...")
-	server, err := net.Listen(ServerType, ServerHost+":"+ServerPort)
+	log.Println("Starting server...")
+	server, err := net.Listen(ServerType, config.Server.Host+":"+strconv.FormatInt(config.Server.Port, 10))
 	if err != nil {
 		log.Println("Could not start server:", err.Error())
 		os.Exit(1)
@@ -37,7 +80,7 @@ func startServer(clients chan net.Conn) {
 		_ = server.Close()
 	}(server)
 
-	log.Println("Listening on " + ServerHost + ":" + ServerPort)
+	log.Println("Listening on", server.Addr().String())
 	for {
 		c, err := server.Accept()
 		if err != nil {
