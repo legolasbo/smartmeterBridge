@@ -1,7 +1,20 @@
 # serial_port is required and points to the serial file handle you want to use.
 serial_port: "/dev/ttyUSB0"
 
-# server is a map containing the server config.
+# dsmr_version is required to configure the serial port correctly.
+# Must be one of:
+# - "2"   - generic meter using DSMR version 2
+# - "2.2" - Dutch meter using DSMR version 2.2
+# - "3"   - generic meter using DSMR version 3
+# - "Q3D" - Easymeter Q3D
+# - "4"   - generic meter using DSMR version 4
+# - "5"   - generic meter using DSMR version 5
+# - "5B"  - Belgian meter using DSMR version 5
+# - "5L"  - Luxembourg meter using DSMR version 5
+# - "5S"  - Swedish meter using DSMR version 5
+dsmr_version: "4"
+
+# server is a map conta2.2ining the server config.
 # - host configures the server address on which the server listens.
 #   This can be a hostname, but this is not recommended because it will create a listener for at most one of the host's IP addresses.
 #   If the parameter is left empty or a literal unspecified IP address, it will listen on all available unicast and anycast IP addresses of the local system.

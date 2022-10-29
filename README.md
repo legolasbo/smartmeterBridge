@@ -16,6 +16,7 @@ which allows it to be compiled to a single executable file that can run without 
 - Add the following lines to `config.yml`:
 ```yaml
 serial_port: "/path/to/your/serial/port"
+dsmr_version: "DSMR VERION OF YOUR METER"
 server:
   port: 9988
 ```

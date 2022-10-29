@@ -29,8 +29,9 @@ func (c ServerConfig) validate() {
 }
 
 type Config struct {
-	SerialPort string       `yaml:"serial_port"`
-	Server     ServerConfig `yaml:"server"`
+	SerialPort  string       `yaml:"serial_port"`
+	DSMRVersion string       `yaml:"dsmr_version"`
+	Server      ServerConfig `yaml:"server"`
 }
 
 var config = Config{}
@@ -40,6 +41,39 @@ func (c Config) validate() {
 		log.Fatal("Serial port is not configured")
 	}
 	c.Server.validate()
+}
+
+func getSerialConfig(port, dsmrVersion string) serial.Config {
+	confs := map[string]serial.Config{
+		"2": {
+			Baud:     9600,
+			Size:     7,
+			Parity:   serial.ParityEven,
+			StopBits: 1,
+		},
+		"4": {
+			Baud:     115200,
+			Size:     8,
+			Parity:   serial.ParityNone,
+			StopBits: 0,
+		},
+	}
+
+	confs["2.2"] = confs["2"]
+	confs["3"] = confs["2"]
+	confs["5"] = confs["4"]
+	confs["5B"] = confs["5"]
+	confs["5L"] = confs["5"]
+	confs["5S"] = confs["5"]
+	confs["Q3D"] = confs["3"]
+
+	conf, ok := confs[dsmrVersion]
+	if !ok {
+		log.Fatal("Unknown dsmr_version. Use 2, 2.2, 3, 4, 5, 5B, 5L, 5S or Q3D")
+	}
+	conf.Name = port
+
+	return conf
 }
 
 func main() {
@@ -62,7 +96,7 @@ func main() {
 
 	rawTelegrams := make(chan string)
 
-	go ReadRawTelegrams(config.SerialPort, rawTelegrams)
+	go ReadRawTelegrams(getSerialConfig(config.SerialPort, config.DSMRVersion), rawTelegrams)
 
 	newConnections := make(chan net.Conn)
 	go startServer(newConnections)
@@ -114,19 +148,14 @@ func sendTelegrams(connections chan net.Conn, telegrams chan string) {
 	}
 }
 
-func ReadRawTelegrams(serialPort string, rawTelegrams chan string) {
+func ReadRawTelegrams(serialConfig serial.Config, rawTelegrams chan string) {
 	lineChan := make(chan string)
-	go readLines(serialPort, lineChan)
+	go readLines(serialConfig, lineChan)
 	go collectTelegrams(lineChan, rawTelegrams)
 }
 
-func readLines(serialPort string, rChan chan string) {
-	c := &serial.Config{
-		Name: serialPort,
-		Baud: 115200,
-	}
-
-	s, err := serial.OpenPort(c)
+func readLines(serialConfig serial.Config, rChan chan string) {
+	s, err := serial.OpenPort(&serialConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
