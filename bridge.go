@@ -32,9 +32,17 @@ type Config struct {
 	SerialPort  string       `yaml:"serial_port"`
 	DSMRVersion string       `yaml:"dsmr_version"`
 	Server      ServerConfig `yaml:"server"`
+	Verbose     bool         `yaml:"verbose"`
 }
 
-var config = Config{}
+var config = Config{
+	DSMRVersion: "4",
+	Server: ServerConfig{
+		Host: "",
+		Port: 9988,
+	},
+	Verbose: false,
+}
 
 func (c Config) validate() {
 	if c.SerialPort == "" {
@@ -142,7 +150,10 @@ func sendTelegrams(connections chan net.Conn, telegrams chan string) {
 					log.Println(c.RemoteAddr(), "disconnected")
 					continue
 				}
-				log.Println(telegram)
+
+				if config.Verbose {
+					log.Println(telegram)
+				}
 			}
 		}
 	}

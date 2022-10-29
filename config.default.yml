@@ -22,3 +22,6 @@ dsmr_version: "4"
 server:
   host: ""
   port: 9988
+
+# enable verbose mode to have the raw telegrams printed to stdOut
+verbose: false
