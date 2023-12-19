@@ -69,7 +69,9 @@ func getSerialConfig(port, dsmrVersion string) serial.Config {
 
 	confs["2.2"] = confs["2"]
 	confs["3"] = confs["2"]
-	confs["5"] = confs["4"]
+	conf5 := confs["4"]
+	conf5.StopBits = 1
+	confs["5"] = conf5
 	confs["5B"] = confs["5"]
 	confs["5L"] = confs["5"]
 	confs["5S"] = confs["5"]
@@ -174,12 +176,13 @@ func readLines(serialConfig serial.Config, rChan chan string) {
 	reader := bufio.NewReader(s)
 	for {
 		reply, err := reader.ReadString('\n')
-		if err != nil {
+		if err != nil && config.Verbose {
 			log.Println(err)
-			continue
 		}
 
-		rChan <- reply
+		if len(reply) > 0 {
+			rChan <- reply
+		}
 	}
 }
 
